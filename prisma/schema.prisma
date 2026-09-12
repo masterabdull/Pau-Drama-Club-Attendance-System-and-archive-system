@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  PRESIDENT
+  VICE_PRESIDENT
+  MUSICAL_THEATRE_HEAD
+  MUSIC_DIRECTOR
+  DRAMA_UNIT_HEAD
+  ASSISTANT_DRAMA_UNIT_HEAD
+  HEAD_OF_SCRIPTWRITERS
+  SECRETARY
+  PUBLICITY_AND_PROMOTIONS
+  HEAD_OF_HOUSE
+  HEAD_OF_STAGE_MANAGEMENT
+  ASSISTANT_STAGE_MANAGEMENT
+  TREASURER_AND_HEAD_OF_WELFARE
+  MEMBER
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum Confidentiality {
+  PUBLIC
+  INTERNAL
+  EXECUTIVE
+  RESTRICTED
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String
+  passwordHash String
+  role         Role          @default(MEMBER)
+  createdAt    DateTime      @default(now())
+  member       Member?
+  auditLogs    AuditLog[]
+  archiveItems ArchiveItem[] @relation("UploadedBy")
+}
+
+model Member {
+  id          String           @id @default(cuid())
+  fullName    String
+  studentId   String           @unique
+  email       String?
+  phone       String?
+  department  String?
+  level       String?
+  clubRole    String?
+  joinedAt    DateTime?
+  status      MembershipStatus @default(ACTIVE)
+  userId      String?          @unique
+  user        User?            @relation(fields: [userId], references: [id])
+  attendance  Attendance[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model AttendanceSession {
+  id          String       @id @default(cuid())
+  name        String
+  date        DateTime
+  time        String?
+  location    String?
+  meetingType String
+  notes       String?
+  createdAt   DateTime     @default(now())
+  attendance  Attendance[]
+}
+
+model Attendance {
+  id        String           @id @default(cuid())
+  status    AttendanceStatus @default(ABSENT)
+  memberId  String
+  sessionId String
+  member    Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  session   AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  updatedAt DateTime         @updatedAt
+
+  @@unique([memberId, sessionId])
+  @@index([sessionId])
+}
+
+model ArchiveItem {
+  id              String          @id @default(cuid())
+  fileName        String
+  storageName     String          @unique
+  mimeType        String
+  size            Int
+  category        String
+  year            Int
+  semester        String?
+  production      String?
+  capturedAt      DateTime?
+  description     String?
+  tags            String?
+  confidentiality Confidentiality @default(INTERNAL)
+  version         String?
+  uploadedById    String
+  uploadedBy      User            @relation("UploadedBy", fields: [uploadedById], references: [id])
+  deletedAt       DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([year, category])
+  @@index([fileName])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  entity    String
+  entityId  String?
+  metadata  String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}

@@ -1,0 +1,50 @@
+import { mkdir, readFile, writeFile } from "fs/promises";
+import path from "path";
+import { randomUUID } from "crypto";
+import { PrismaClient } from "@prisma/client";
+
+type Row = Record<string, any>;
+type Store = { users: Row[]; members: Row[]; sessions: Row[]; attendance: Row[]; archiveItems: Row[]; auditLogs: Row[] };
+const emptyStore: Store = { users: [], members: [], sessions: [], attendance: [], archiveItems: [], auditLogs: [] };
+const dataFile = path.join(process.cwd(), "data", "local-db.json");
+
+async function load(): Promise<Store> { try { return { ...emptyStore, ...JSON.parse(await readFile(dataFile, "utf8")) }; } catch { await mkdir(path.dirname(dataFile), { recursive: true }); await writeFile(dataFile, JSON.stringify(emptyStore, null, 2)); return structuredClone(emptyStore); } }
+async function save(store: Store) { await mkdir(path.dirname(dataFile), { recursive: true }); await writeFile(dataFile, JSON.stringify(store, null, 2)); }
+function id() { return randomUUID(); }
+function matches(row: Row, where?: Row): boolean { if (!where) return true; if (where.OR) return where.OR.some((item: Row) => matches(row, item)); return Object.entries(where).every(([key, expected]) => { if (expected && typeof expected === "object" && "contains" in expected) return String(row[key] || "").toLowerCase().includes(String(expected.contains).toLowerCase()); if (expected && typeof expected === "object" && "not" in expected) return row[key] !== expected.not; return row[key] === expected; }); }
+function pick(row: Row, select?: Row) { return select ? Object.fromEntries(Object.keys(select).filter((key) => select[key]).map((key) => [key, row[key]])) : row; }
+function ordered(rows: Row[], orderBy?: Row, take?: number) { const [key, direction] = orderBy ? Object.entries(orderBy)[0] : []; const sorted = key ? [...rows].sort((a, b) => String(a[key]).localeCompare(String(b[key]))) : rows; if (direction === "desc") sorted.reverse(); return take ? sorted.slice(0, take) : sorted; }
+
+class LocalRepository {
+  async user_findUnique(args: Row) { const store = await load(); const row = store.users.find((item) => matches(item, args.where)); return row ? pick(row, args.select) : null; }
+  async user_findMany(args: Row = {}) { const store = await load(); return store.users.filter((row) => matches(row, args.where)).map((row) => pick(row, args.select)); }
+  async user_count() { return (await load()).users.length; }
+  async user_create(args: Row) { const store = await load(); const row = { id: id(), createdAt: new Date().toISOString(), ...args.data }; store.users.push(row); await save(store); return row; }
+  async user_update(args: Row) { const store = await load(); const index = store.users.findIndex((row) => matches(row, args.where)); if (index < 0) throw new Error("User not found"); store.users[index] = { ...store.users[index], ...args.data }; await save(store); return store.users[index]; }
+  async member_findMany(args: Row = {}) { const store = await load(); let rows = ordered(store.members.filter((row) => matches(row, args.where)), args.orderBy, args.take); if (args.include?.attendance) rows = rows.map((row) => ({ ...row, attendance: store.attendance.filter((item) => item.memberId === row.id) })); return rows; }
+  async member_findFirst(args: Row = {}) { const store = await load(); const row = store.members.find((item) => matches(item, args.where)); return row ? (args.include?.attendance ? { ...row, attendance: store.attendance.filter((item) => item.memberId === row.id) } : row) : null; }
+  async member_create(args: Row) { const store = await load(); const row = { id: id(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), status: "ACTIVE", ...args.data }; store.members.push(row); await save(store); return row; }
+  async session_findMany(args: Row = {}) { const store = await load(); let rows = ordered(store.sessions.filter((row) => matches(row, args.where)), args.orderBy, args.take); if (args.include?.attendance) rows = rows.map((row) => ({ ...row, attendance: store.attendance.filter((item) => item.sessionId === row.id) })); return rows; }
+  async session_count(args: Row = {}) { const store = await load(); return store.sessions.filter((row) => matches(row, args.where)).length; }
+  async session_create(args: Row) { const store = await load(); const now = new Date().toISOString(); const row = { id: id(), createdAt: now, ...args.data }; row.date = row.date instanceof Date ? row.date.toISOString() : row.date; store.sessions.push(row); if (args.data.attendance?.create) { for (const item of args.data.attendance.create) store.attendance.push({ id: id(), status: "ABSENT", ...item, sessionId: row.id, updatedAt: now }); delete row.attendance; } await save(store); return { ...row, attendance: store.attendance.filter((item) => item.sessionId === row.id) }; }
+  async attendance_findMany() { return (await load()).attendance; }
+  async attendance_createMany(args: Row) { const store = await load(); const now = new Date().toISOString(); store.attendance.push(...args.data.map((item: Row) => ({ id: id(), status: "ABSENT", updatedAt: now, ...item }))); await save(store); return { count: args.data.length }; }
+  async attendance_upsert(args: Row) { const store = await load(); const index = store.attendance.findIndex((row) => row.memberId === args.where.memberId_sessionId.memberId && row.sessionId === args.where.memberId_sessionId.sessionId); if (index >= 0) store.attendance[index] = { ...store.attendance[index], ...args.update, updatedAt: new Date().toISOString() }; else store.attendance.push({ id: id(), ...args.create, updatedAt: new Date().toISOString() }); await save(store); return store.attendance[index >= 0 ? index : store.attendance.length - 1]; }
+  async archive_findMany(args: Row = {}) { const store = await load(); let rows = ordered(store.archiveItems.filter((row) => matches(row, args.where)), args.orderBy, args.take); if (args.include?.uploadedBy) rows = rows.map((row) => ({ ...row, uploadedBy: pick(store.users.find((user) => user.id === row.uploadedById) || {}, { name: true }) })); return rows; }
+  async archive_count(args: Row = {}) { const store = await load(); return store.archiveItems.filter((row) => matches(row, args.where)).length; }
+  async archive_findFirst(args: Row) { const store = await load(); return store.archiveItems.find((row) => matches(row, args.where)) || null; }
+  async archive_create(args: Row) { const store = await load(); const row = { id: id(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...args.data }; store.archiveItems.push(row); await save(store); return row; }
+  async archive_update(args: Row) { const store = await load(); const index = store.archiveItems.findIndex((row) => row.id === args.where.id); store.archiveItems[index] = { ...store.archiveItems[index], ...args.data, updatedAt: new Date().toISOString() }; await save(store); return store.archiveItems[index]; }
+  async audit_create(args: Row) { const store = await load(); const row = { id: id(), createdAt: new Date().toISOString(), ...args.data }; store.auditLogs.push(row); await save(store); return row; }
+  async disconnect() {}
+}
+
+const repository = new LocalRepository();
+const localPrisma = { user: { findUnique: repository.user_findUnique.bind(repository), findMany: repository.user_findMany.bind(repository), count: repository.user_count.bind(repository), create: repository.user_create.bind(repository), update: repository.user_update.bind(repository) }, member: { findMany: repository.member_findMany.bind(repository), findFirst: repository.member_findFirst.bind(repository), create: repository.member_create.bind(repository) }, attendanceSession: { findMany: repository.session_findMany.bind(repository), count: repository.session_count.bind(repository), create: repository.session_create.bind(repository) }, attendance: { findMany: repository.attendance_findMany.bind(repository), createMany: repository.attendance_createMany.bind(repository), upsert: repository.attendance_upsert.bind(repository) }, archiveItem: { findMany: repository.archive_findMany.bind(repository), count: repository.archive_count.bind(repository), findFirst: repository.archive_findFirst.bind(repository), create: repository.archive_create.bind(repository), update: repository.archive_update.bind(repository) }, auditLog: { create: repository.audit_create.bind(repository) }, $disconnect: repository.disconnect.bind(repository) };
+
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+const generatedPrisma = globalForPrisma.prisma || new PrismaClient();
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = generatedPrisma;
+
+// Local JSON storage is opt-in for quick demos. Deployments use Prisma by default.
+export const prisma = process.env.DATA_BACKEND === "local" ? localPrisma : generatedPrisma;

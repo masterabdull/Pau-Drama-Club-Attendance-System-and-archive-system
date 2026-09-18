@@ -78,6 +78,7 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
   const [signingUp, setSigningUp] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [department, setDepartment] = useState("");
   const [birthday, setBirthday] = useState("");
   const [course, setCourse] = useState("");
   const [level, setLevel] = useState("");
@@ -102,7 +103,7 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
     try {
       const endpoint = signingUp ? "/api/auth/signup" : "/api/auth/login";
       const body = signingUp
-        ? { fullName: name, email, birthday, course, level, hostel, pronouns, gender, password, confirmPassword }
+        ? { fullName: name, email, department, birthday, course, level, hostel, pronouns, gender, password, confirmPassword }
         : { email, password };
       const data = await requestJson(endpoint, {
         method: "POST",
@@ -142,6 +143,10 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
           )}
           {signingUp && !signingUpAsAdmin && (
             <>
+              <label>
+                Department
+                <input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="Your department" required />
+              </label>
               <div className="form-row">
                 <label>
                   Birthday
@@ -280,11 +285,27 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  async function refreshUser() {
+    try {
+      const data = await requestJson("/api/auth/me");
+      setUser(data.user);
+    } catch {
+      setUser(null);
+    }
+  }
   useEffect(() => {
-    requestJson("/api/auth/me")
-      .then((data) => setUser(data.user))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    refreshUser().finally(() => setLoading(false));
+  }, []);
+  useEffect(() => {
+    function handleFocus() {
+      if (document.visibilityState === "visible") void refreshUser();
+    }
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
   }, []);
   if (loading)
     return <div className="loading-screen">Loading workspace...</div>;
@@ -292,6 +313,7 @@ export default function Home() {
   return (
     <Workspace
       user={user}
+      onUserUpdate={setUser}
       onLogout={() => {
         fetch("/api/auth/logout", { method: "POST" });
         setUser(null);
@@ -300,7 +322,7 @@ export default function Home() {
   );
 }
 
-function Workspace({ user, onLogout }: { user: User; onLogout: () => void }) {
+function Workspace({ user, onLogout, onUserUpdate }: { user: User; onLogout: () => void; onUserUpdate: (user: User) => void }) {
   const [view, setView] = useState<
     "attendance" | "archive" | "members" | "access"
   >("attendance");
@@ -309,6 +331,9 @@ function Workspace({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [error, setError] = useState("");
   const canEditAttendance = canManageAttendance(user.role);
   const canEditArchive = canManageArchive(user.role);
+  useEffect(() => {
+    if (user.role !== "SUPER_ADMIN" && view === "access") setView("attendance");
+  }, [user.role, view]);
   async function refresh() {
     try {
       setOverview(await requestJson("/api/overview"));
@@ -447,7 +472,7 @@ function Workspace({ user, onLogout }: { user: User; onLogout: () => void }) {
         {view === "members" && user.role !== "MEMBER" && (
           <MembersView canEdit={canEditAttendance} onFlash={flash} />
         )}
-        {view === "access" && <AccessView onFlash={flash} />}
+        {view === "access" && <AccessView user={user} onUserUpdate={onUserUpdate} onFlash={flash} />}
       </main>
     </div>
   );
@@ -1265,8 +1290,12 @@ function UploadModal({
 }
 
 function AccessView({
+  user,
+  onUserUpdate,
   onFlash,
 }: {
+  user: User;
+  onUserUpdate: (user: User) => void;
   onFlash: (message: string) => Promise<void>;
 }) {
   const [users, setUsers] = useState<User[]>([]);
@@ -1289,6 +1318,10 @@ function AccessView({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, role }),
       });
+      if (id === user.id) {
+        const refreshed = await requestJson("/api/auth/me");
+        onUserUpdate(refreshed.user);
+      }
       await onFlash("Access updated.");
       await load();
     } catch (err) {

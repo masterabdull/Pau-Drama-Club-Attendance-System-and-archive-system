@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser, hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canManageUsers } from "@/lib/permissions";
 import { isConfiguredSuperAdmin, roleOptions, type AppRole } from "@/lib/permissions";
 import { rejectCrossSiteRequest } from "@/lib/security";
 
@@ -12,7 +11,8 @@ const updateSchema = z.object({ id: z.string().min(1), role });
 
 async function requireSuperAdmin() {
   const user = await getCurrentUser();
-  return user && canManageUsers(user.role) && isConfiguredSuperAdmin(user.email) ? user : null;
+  if (!user || user.role !== "SUPER_ADMIN" || !isConfiguredSuperAdmin(user.email)) return null;
+  return user;
 }
 
 export async function GET() {

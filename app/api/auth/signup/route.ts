@@ -8,6 +8,7 @@ import { rejectCrossSiteRequest } from "@/lib/security";
 const schema = z.object({
   fullName: z.string().trim().min(2).max(100),
   email: z.string().trim().email().max(160),
+  department: z.string().trim().min(2).max(120).optional(),
   birthday: z.string().date().optional(),
   course: z.string().trim().min(2).max(120).optional(),
   level: z.string().trim().min(1).max(40).optional(),
@@ -19,7 +20,7 @@ const schema = z.object({
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match.",
   path: ["confirmPassword"],
-}).refine((data) => isConfiguredSuperAdmin(data.email) || Boolean(data.birthday && data.course && data.level && data.hostel && data.pronouns && data.gender), {
+}).refine((data) => isConfiguredSuperAdmin(data.email) || Boolean(data.department && data.birthday && data.course && data.level && data.hostel && data.pronouns && data.gender), {
   message: "Complete all member profile fields.",
   path: ["course"],
 });
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
       data: {
         fullName: body.data.fullName,
         email,
+        department: body.data.department,
         birthday: new Date(`${body.data.birthday}T00:00:00.000Z`),
         course: body.data.course,
         level: body.data.level,

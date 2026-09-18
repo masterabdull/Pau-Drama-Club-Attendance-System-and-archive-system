@@ -4,6 +4,7 @@ import { getCurrentUser, hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageUsers } from "@/lib/permissions";
 import { isConfiguredSuperAdmin, roleOptions, type AppRole } from "@/lib/permissions";
+import { rejectCrossSiteRequest } from "@/lib/security";
 
 const role = z.enum(roleOptions as [AppRole, ...AppRole[]]);
 const createSchema = z.object({ name: z.string().trim().min(2).max(100), email: z.string().email(), password: z.string().min(12).max(128), role });
@@ -21,6 +22,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const crossSite = rejectCrossSiteRequest(request);
+  if (crossSite) return crossSite;
   const admin = await requireSuperAdmin();
   if (!admin) return NextResponse.json({ error: "Super Admin access required." }, { status: 403 });
   const body = createSchema.safeParse(await request.json());
@@ -34,6 +37,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const crossSite = rejectCrossSiteRequest(request);
+  if (crossSite) return crossSite;
   const admin = await requireSuperAdmin();
   if (!admin) return NextResponse.json({ error: "Super Admin access required." }, { status: 403 });
   const body = updateSchema.safeParse(await request.json());

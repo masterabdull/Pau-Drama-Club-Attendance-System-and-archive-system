@@ -30,7 +30,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       body = Buffer.from(await readFile(path.join(storageDirectory, item.storageName)));
     }
     await prisma.auditLog.create({ data: { action: "downloaded", entity: "archive", entityId: item.id, userId: user.id } });
-    return new NextResponse(body, { headers: { "Content-Type": item.mimeType, "Content-Disposition": `inline; filename="${item.fileName.replace(/"/g, "")}"`, "Cache-Control": "private, no-store" } });
+    return new NextResponse(body, { headers: { "Content-Type": item.mimeType, "Content-Disposition": `attachment; filename="${item.fileName.replace(/[\\r\\n"]/g, "")}"`, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
   } catch {
     return NextResponse.json({ error: "Stored file is unavailable." }, { status: 404 });
   }

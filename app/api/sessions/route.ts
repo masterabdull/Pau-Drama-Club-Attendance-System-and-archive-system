@@ -3,10 +3,13 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageAttendance } from "@/lib/permissions";
+import { rejectCrossSiteRequest } from "@/lib/security";
 
 const schema = z.object({ name: z.string().min(2), date: z.string(), time: z.string().optional(), location: z.string().optional(), meetingType: z.string().min(2), notes: z.string().optional() });
 
 export async function POST(request: Request) {
+  const crossSite = rejectCrossSiteRequest(request);
+  if (crossSite) return crossSite;
   const user = await getCurrentUser();
   if (!user || !canManageAttendance(user.role)) return NextResponse.json({ error: "You do not have permission to create sessions." }, { status: 403 });
   const body = schema.safeParse(await request.json());

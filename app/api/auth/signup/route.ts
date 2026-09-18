@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createSession, hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isConfiguredSuperAdmin } from "@/lib/permissions";
+import { rejectCrossSiteRequest } from "@/lib/security";
 
 const schema = z.object({
   fullName: z.string().trim().min(2).max(100),
@@ -24,6 +25,8 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
+  const crossSite = rejectCrossSiteRequest(request);
+  if (crossSite) return crossSite;
   const body = schema.safeParse(await request.json());
   if (!body.success) {
     const passwordError = body.error.issues.some((issue) => issue.path.includes("confirmPassword"));

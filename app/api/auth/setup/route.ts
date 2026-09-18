@@ -3,10 +3,13 @@ import { z } from "zod";
 import { createSession, hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isConfiguredSuperAdmin } from "@/lib/permissions";
+import { rejectCrossSiteRequest } from "@/lib/security";
 
 const schema = z.object({ name: z.string().trim().min(2).max(100), email: z.string().email(), password: z.string().min(12).max(128) });
 
 export async function POST(request: Request) {
+  const crossSite = rejectCrossSiteRequest(request);
+  if (crossSite) return crossSite;
   if ((await prisma.user.count()) > 0) return NextResponse.json({ error: "An administrator has already been created." }, { status: 409 });
   const body = schema.safeParse(await request.json());
   if (!body.success) return NextResponse.json({ error: "Enter your name, PAU email, and a password with at least 12 characters." }, { status: 400 });

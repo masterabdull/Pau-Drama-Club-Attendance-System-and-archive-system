@@ -7,7 +7,11 @@ import { isConfiguredSuperAdmin } from "@/lib/permissions";
 const cookieName = "pau_drama_session";
 
 function secret() {
-  return new TextEncoder().encode(process.env.SESSION_SECRET || "local-development-secret-change-me");
+  const value = process.env.SESSION_SECRET;
+  if (!value && process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET must be set in production.");
+  }
+  return new TextEncoder().encode(value || "local-development-secret-change-me");
 }
 
 export async function hashPassword(password: string) {
@@ -20,7 +24,7 @@ export async function verifyPassword(password: string, hash: string) {
 
 export async function createSession(userId: string) {
   const token = await new SignJWT({ userId }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("7d").sign(secret());
-  (await cookies()).set(cookieName, token, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 60 * 60 * 24 * 7, path: "/" });
+  (await cookies()).set(cookieName, token, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 60 * 60 * 24 * 7, path: "/", priority: "high" });
 }
 
 export async function clearSession() {

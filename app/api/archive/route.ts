@@ -7,6 +7,7 @@ import { randomUUID } from "crypto";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { archiveScope, canManageArchive } from "@/lib/permissions";
+import { rejectCrossSiteRequest } from "@/lib/security";
 
 export const runtime = "nodejs";
 
@@ -27,11 +28,16 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const crossSite = rejectCrossSiteRequest(request);
+  if (crossSite) return crossSite;
   const user = await getCurrentUser();
   if (!user || !canManageArchive(user.role)) return NextResponse.json({ error: "You do not have permission to upload archive items." }, { status: 403 });
   const form = await request.formData();
   const file = form.get("file");
   if (!(file instanceof File) || file.size === 0) return NextResponse.json({ error: "Choose a file to upload." }, { status: 400 });
+  const allowedTypes = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp", "audio/mpeg", "audio/wav", "video/mp4", "text/plain", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
+  const maxFileSize = 25 * 1024 * 1024;
+  if (!allowedTypes.has(file.type) || file.size > maxFileSize) return NextResponse.json({ error: "Upload a supported document, image, audio, or video file under 25 MB." }, { status: 400 });
   const year = Number(form.get("year") || new Date().getFullYear());
   const storageName = `${randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
   let storedName = storageName;
@@ -45,5 +51,5 @@ export async function POST(request: Request) {
   }
   const item = await prisma.archiveItem.create({ data: { fileName: file.name, storageName: storedName, mimeType: file.type || "application/octet-stream", size: file.size, category: String(form.get("category") || "Other"), year: Number.isFinite(year) ? year : new Date().getFullYear(), semester: String(form.get("semester") || ""), production: String(form.get("production") || ""), description: String(form.get("description") || ""), tags: String(form.get("tags") || ""), confidentiality: (String(form.get("confidentiality") || "INTERNAL") as "PUBLIC" | "INTERNAL" | "EXECUTIVE" | "RESTRICTED"), version: String(form.get("version") || "Final"), uploadedById: user.id } });
   await prisma.auditLog.create({ data: { action: "uploaded", entity: "archive", entityId: item.id, metadata: JSON.stringify({ fileName: item.fileName }), userId: user.id } });
-  return NextResponse.json({ item }, { status: 201 });
+  return NextResponse.json({ item }, { status: 201, headers: { "Cache-Control": "no-store" } });
 }

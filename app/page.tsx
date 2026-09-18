@@ -1927,7 +1927,6 @@ function MemberModal({
             <input
               value={form.studentId}
               onChange={(e) => setForm({ ...form, studentId: e.target.value })}
-              required
             />
           </label>
           <label>

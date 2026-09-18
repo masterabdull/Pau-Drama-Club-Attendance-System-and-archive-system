@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { canManageAttendance } from "@/lib/permissions";
 import { rejectCrossSiteRequest } from "@/lib/security";
 
-const schema = z.object({ fullName: z.string().min(2), studentId: z.string().min(2).optional().or(z.literal("")), email: z.string().email().optional().or(z.literal("")), birthday: z.coerce.date().optional().nullable(), course: z.string().optional(), hostel: z.string().optional(), pronouns: z.string().optional(), gender: z.string().optional(), department: z.string().optional(), level: z.string().optional(), clubRole: z.string().optional() });
+const schema = z.object({ fullName: z.string().min(2), studentId: z.string().trim().max(50).optional().or(z.literal("")), email: z.string().email().optional().or(z.literal("")), birthday: z.coerce.date().optional().nullable(), course: z.string().optional(), hostel: z.string().optional(), pronouns: z.string().optional(), gender: z.string().optional(), department: z.string().optional(), level: z.string().optional(), clubRole: z.string().optional() });
 const updateSchema = schema.extend({ id: z.string().min(1), status: z.enum(["ACTIVE", "INACTIVE"]).optional() });
 
 export async function GET(request: Request) {

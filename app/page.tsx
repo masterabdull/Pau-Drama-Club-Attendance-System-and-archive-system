@@ -600,6 +600,9 @@ function AttendanceView({
           icon={<BarChart3 size={18} />}
           accent
         />
+        <Stat label="Meetings this month" value={stats.meetingsThisMonth} icon={<CalendarDays size={18} />} />
+        <Stat label="Highest attendance" value={`${stats.highestAttendance}%`} icon={<BarChart3 size={18} />} />
+        <Stat label="Lowest attendance" value={`${stats.lowestAttendance}%`} icon={<BarChart3 size={18} />} />
       </div>
       {canEdit && <MonthlyAttendanceReport />}
       <AttendanceCharts data={data} />

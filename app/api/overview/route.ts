@@ -29,6 +29,8 @@ export async function GET() {
   ]);
   const attended = attendance.filter((item: any) => item.status === "PRESENT" || item.status === "LATE").length;
   const averageAttendance = attendance.length ? (attended / attendance.length) * 100 : 0;
+  const now = new Date();
+  const meetingsThisMonth = sessions.filter((session: any) => { const date = new Date(session.date); return date.getUTCFullYear() === now.getUTCFullYear() && date.getUTCMonth() === now.getUTCMonth(); }).length;
   const ranking = members.map((member: any) => {
     const count = member.attendance.length;
     const present = member.attendance.filter((item: any) => item.status === "PRESENT" || item.status === "LATE").length;
@@ -50,5 +52,5 @@ export async function GET() {
     result[session.meetingType] = total ? Math.round((result[session.meetingType] || 0) + (present / total) * 100) : result[session.meetingType] || 0;
     return result;
   }, {});
-  return NextResponse.json({ stats: { members: members.length, sessions: await prisma.attendanceSession.count(), averageAttendance, archiveItems: await prisma.archiveItem.count({ where: { deletedAt: null } }), byKind, trends, byMeetingType }, ranking, sessions, archive });
+  return NextResponse.json({ stats: { members: members.length, sessions: await prisma.attendanceSession.count(), meetingsThisMonth, highestAttendance: ranking.length ? Math.round(ranking[0].rate) : 0, lowestAttendance: ranking.length ? Math.round(ranking[ranking.length - 1].rate) : 0, averageAttendance, archiveItems: await prisma.archiveItem.count({ where: { deletedAt: null } }), byKind, trends, byMeetingType }, ranking, sessions, archive });
 }

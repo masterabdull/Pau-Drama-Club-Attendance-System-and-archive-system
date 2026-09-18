@@ -1569,6 +1569,23 @@ function AccessView({
   );
 }
 
+function AuditView() {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    requestJson("/api/audit").then((data) => setLogs(data.logs)).catch((err) => setError(err instanceof Error ? err.message : "Could not load the audit log."));
+  }, []);
+  return (
+    <div className="workspace">
+      <div className="section-head"><div><h2>Audit log</h2><p className="muted">Important account, attendance, and archive actions.</p></div></div>
+      <section className="panel">
+        {error && <p className="error-text">{error}</p>}
+        {logs.length ? <div className="table-wrap"><table><thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead><tbody>{logs.map((log) => <tr key={log.id}><td>{new Date(log.createdAt).toLocaleString()}</td><td><strong>{log.user?.name || "Unknown"}</strong><small>{log.user?.email}</small></td><td>{log.action}</td><td>{log.entity}</td><td>{log.metadata || "-"}</td></tr>)}</tbody></table></div> : !error ? <EmptyState title="No audit events yet" copy="Important actions will appear here." /> : null}
+      </section>
+    </div>
+  );
+}
+
 function AccountModal({
   onClose,
   onCreated,

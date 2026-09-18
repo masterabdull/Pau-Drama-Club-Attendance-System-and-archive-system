@@ -60,6 +60,11 @@ type ArchiveItem = {
   confidentiality: string;
   uploadedBy: { name: string };
   createdAt: string;
+  storageName?: string;
+  description?: string | null;
+  tags?: string | null;
+  version?: string | null;
+  capturedAt?: string | null;
 };
 
 const attendanceLabels: Record<string, string> = {
@@ -1178,6 +1183,7 @@ function ArchiveView({
   const [items, setItems] = useState<ArchiveItem[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
+  const [selectedItem, setSelectedItem] = useState<ArchiveItem | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   useEffect(() => {
     requestJson(`/api/archive?search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}`).then(
@@ -1252,10 +1258,10 @@ function ArchiveView({
           <div className="archive-folders">
             {Object.entries(groupedItems).map(([folder, folderItems]) => <section className="archive-folder" key={folder}>
               <div className="folder-heading"><div><FolderOpen size={18} /><h4>{folder}</h4></div><span>{folderItems.length} {folderItems.length === 1 ? "file" : "files"}</span></div>
-              <div className="archive-grid">{folderItems.map((item) => <div className="archive-item" key={item.id}>
+              <div className="archive-grid">{folderItems.map((item) => <div className="archive-item" key={item.id} onClick={() => setSelectedItem(item)}>
                 <div className="file-icon"><Archive size={20} /></div>
                 <div className="archive-item-copy"><strong>{item.fileName}</strong><small>{item.year} · {item.category} · {item.confidentiality}</small><small>{item.uploadedBy.name} · {formatSize(item.size)}</small></div>
-                <div className="item-actions"><a className="icon-button" title="Preview or download" href={`/api/archive/${item.id}/download`} target="_blank"><ChevronRight size={17} /></a></div>
+                <div className="item-actions"><button className="icon-button" title="View file details" onClick={(event) => { event.stopPropagation(); setSelectedItem(item); }}><ChevronRight size={17} /></button></div>
               </div>)}</div>
             </section>)}
           </div>
@@ -1266,6 +1272,7 @@ function ArchiveView({
           />
         )}
       </section>
+      {selectedItem && <ArchiveDetailsModal item={selectedItem} canEdit={canEdit} onClose={() => setSelectedItem(null)} onDeleted={async () => { setSelectedItem(null); await onFlash("Archive item moved to recycle bin."); requestJson(`/api/archive?search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}`).then((result) => setItems(result.items)); }} />}
       {uploadOpen && (
         <UploadModal
           onClose={() => setUploadOpen(false)}
@@ -1280,6 +1287,22 @@ function ArchiveView({
       )}
     </div>
   );
+}
+function ArchiveDetailsModal({ item, canEdit, onClose, onDeleted }: { item: ArchiveItem; canEdit: boolean; onClose: () => void; onDeleted: () => Promise<void> }) {
+  const [error, setError] = useState("");
+  const previewable = item.mimeType.startsWith("image/") || item.mimeType.startsWith("video/") || item.mimeType.startsWith("audio/") || item.mimeType === "application/pdf";
+  async function remove() {
+    if (!window.confirm(`Move "${item.fileName}" to the recycle bin?`)) return;
+    try { await requestJson(`/api/archive/${item.id}`, { method: "DELETE" }); await onDeleted(); } catch (err) { setError(err instanceof Error ? err.message : "Could not remove archive item."); }
+  }
+  return <Modal title={item.fileName} subtitle={`${item.year} · ${item.category} · ${item.confidentiality}`} onClose={onClose}>
+    {previewable && <div className="archive-preview">{item.mimeType.startsWith("image/") ? <img src={`/api/archive/${item.id}/download`} alt={item.fileName} /> : item.mimeType.startsWith("video/") ? <video controls src={`/api/archive/${item.id}/download`} /> : item.mimeType.startsWith("audio/") ? <audio controls src={`/api/archive/${item.id}/download`} /> : <iframe title={item.fileName} src={`/api/archive/${item.id}/download`} />}</div>}
+    <dl className="file-details"><div><dt>Uploaded by</dt><dd>{item.uploadedBy.name}</dd></div><div><dt>Semester</dt><dd>{item.semester || "Not set"}</dd></div><div><dt>Production/Event</dt><dd>{item.production || "Not set"}</dd></div><div><dt>Version</dt><dd>{item.version || "Not set"}</dd></div><div><dt>File type</dt><dd>{item.mimeType}</dd></div><div><dt>Size</dt><dd>{formatSize(item.size)}</dd></div></dl>
+    {item.description && <p className="muted file-description">{item.description}</p>}
+    {item.tags && <p className="muted">Tags: {item.tags}</p>}
+    {error && <p className="error-text">{error}</p>}
+    <div className="modal-actions"><a className="button archive-button" href={`/api/archive/${item.id}/download`} target="_blank">Download</a>{canEdit && <button className="button quiet danger-button" onClick={remove}>Recycle item</button>}</div>
+  </Modal>;
 }
 function formatSize(size: number) {
   if (!size) return "Metadata record";

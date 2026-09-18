@@ -59,11 +59,16 @@ model User {
 model Member {
   id          String           @id @default(cuid())
   fullName    String
-  studentId   String           @unique
+  studentId   String?          @unique
   email       String?
+  birthday    DateTime?
+  course      String?
   phone       String?
   department  String?
   level       String?
+  hostel      String?
+  pronouns    String?
+  gender      String?
   clubRole    String?
   joinedAt    DateTime?
   status      MembershipStatus @default(ACTIVE)

@@ -206,6 +206,11 @@ textarea {
   font-size: 13px;
   margin: 0;
 }
+.auth-switch {
+  justify-content: center;
+  width: 100%;
+  padding: 4px;
+}
 .notice,
 .error-banner {
   margin: 0 32px 18px;

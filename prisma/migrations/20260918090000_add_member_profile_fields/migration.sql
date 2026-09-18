@@ -1,0 +1,5 @@
+ALTER TABLE "Member" ADD COLUMN "birthday" TIMESTAMP(3),
+ADD COLUMN "course" TEXT,
+ADD COLUMN "hostel" TEXT,
+ADD COLUMN "pronouns" TEXT,
+ADD COLUMN "gender" TEXT;

@@ -1,0 +1,1 @@
+ALTER TABLE "Member" ALTER COLUMN "studentId" DROP NOT NULL;

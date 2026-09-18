@@ -23,6 +23,7 @@ import {
 import {
   canManageArchive,
   canManageAttendance,
+  isConfiguredSuperAdmin,
   roleLabels,
   roleOptions,
 } from "@/lib/permissions";
@@ -74,31 +75,35 @@ async function requestJson(url: string, options?: RequestInit) {
 }
 
 function Login({ onLogin }: { onLogin: (user: User) => void }) {
-  const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+  const [signingUp, setSigningUp] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [birthday, setBirthday] = useState("");
+  const [course, setCourse] = useState("");
+  const [level, setLevel] = useState("");
+  const [hostel, setHostel] = useState("");
+  const [pronouns, setPronouns] = useState("");
+  const [gender, setGender] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    requestJson("/api/auth/setup-status")
-      .then((data) => setNeedsSetup(data.needsSetup))
-      .catch(() => setError("Unable to check the workspace setup."));
-  }, []);
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError("");
-    if (needsSetup && password !== confirmPassword) {
+    if (signingUp && password !== confirmPassword) {
       setError("Passwords do not match.");
       setBusy(false);
       return;
     }
     try {
-      const endpoint = needsSetup ? "/api/auth/setup" : "/api/auth/login";
-      const body = needsSetup ? { name, email, password } : { email, password };
+      const endpoint = signingUp ? "/api/auth/signup" : "/api/auth/login";
+      const body = signingUp
+        ? { fullName: name, email, birthday, course, level, hostel, pronouns, gender, password, confirmPassword }
+        : { email, password };
       const data = await requestJson(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -111,22 +116,22 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
       setBusy(false);
     }
   }
-  const setup = needsSetup === true;
+  const signingUpAsAdmin = signingUp && isConfiguredSuperAdmin(email);
   return (
     <main className="login-shell">
       <section className="login-panel">
         <div className="brand-mark">PAU Drama Club</div>
         <p className="eyebrow">Attendance and archive workspace</p>
-        <h1>{setup ? "Set up your workspace." : "Welcome back."}</h1>
+        <h1>{signingUp ? "Join the club." : "Welcome back."}</h1>
         <p className="muted">
-          {setup
-            ? "Create the first administrator account. No members, attendance records, or archive files have been added yet."
+          {signingUp
+            ? "Create your member account to access attendance and club updates."
             : "Sign in to work with the club's attendance and digital archive."}
         </p>
         <form onSubmit={submit} className="stack">
-          {setup && (
+          {signingUp && !signingUpAsAdmin && (
             <label>
-              Your name
+              Full name
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -134,6 +139,42 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
                 required
               />
             </label>
+          )}
+          {signingUp && !signingUpAsAdmin && (
+            <>
+              <div className="form-row">
+                <label>
+                  Birthday
+                  <input type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} required />
+                </label>
+              </div>
+              <div className="form-row">
+                <label>
+                  Course
+                  <input value={course} onChange={(e) => setCourse(e.target.value)} placeholder="Your course" required />
+                </label>
+                <label>
+                  Level
+                  <input value={level} onChange={(e) => setLevel(e.target.value)} placeholder="e.g. 300 level" required />
+                </label>
+              </div>
+              <div className="form-row">
+                <label>
+                  Hostel
+                  <input value={hostel} onChange={(e) => setHostel(e.target.value)} placeholder="Hostel" required />
+                </label>
+                <label>
+                  Gender
+                  <input value={gender} onChange={(e) => setGender(e.target.value)} placeholder="Gender" required />
+                </label>
+              </div>
+              <div className="form-row">
+                <label>
+                  Pronouns
+                  <input value={pronouns} onChange={(e) => setPronouns(e.target.value)} placeholder="e.g. she/her" required />
+                </label>
+              </div>
+            </>
           )}
           <label>
             PAU email
@@ -152,8 +193,8 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={setup ? "At least 12 characters" : "Your password"}
-                minLength={setup ? 12 : undefined}
+                placeholder={signingUp ? "At least 12 characters" : "Your password"}
+                minLength={signingUp ? 12 : undefined}
                 required
               />
               <button
@@ -167,12 +208,12 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
               </button>
             </div>
           </label>
-          {setup && (
+          {signingUp && (
             <label>
               Confirm password
               <div className="password-field">
                 <input
-                  type={showPassword ? "text" : "password"}
+                  type={showConfirmPassword ? "text" : "password"}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Repeat your password"
@@ -182,11 +223,11 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
                 <button
                   type="button"
                   className="password-toggle"
-                  onClick={() => setShowPassword((visible) => !visible)}
-                  title={showPassword ? "Hide password" : "Show password"}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  onClick={() => setShowConfirmPassword((visible) => !visible)}
+                  title={showConfirmPassword ? "Hide password" : "Show password"}
+                  aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  {showConfirmPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>
               </div>
             </label>
@@ -194,14 +235,24 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
           {error && <p className="error-text">{error}</p>}
           <button
             className="button primary full"
-            disabled={busy || needsSetup === null}
+            disabled={busy}
           >
             {busy
               ? "Please wait..."
-              : setup
-                ? "Create administrator account"
+              : signingUp
+                ? signingUpAsAdmin ? "Create Super Admin account" : "Create member account"
                 : "Sign in"}
           </button>
+          {!signingUp && (
+            <button type="button" className="text-button auth-switch" onClick={() => { setSigningUp(true); setError(""); }}>
+              New club member? Create an account
+            </button>
+          )}
+          {signingUp && (
+            <button type="button" className="text-button auth-switch" onClick={() => { setSigningUp(false); setError(""); }}>
+              Already have an account? Sign in
+            </button>
+          )}
         </form>
       </section>
       <aside className="login-aside">

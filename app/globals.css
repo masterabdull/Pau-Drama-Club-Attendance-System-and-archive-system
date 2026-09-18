@@ -216,6 +216,10 @@ textarea {
 .button.quiet {
   background: #f1f3f7;
 }
+.danger-button {
+  color: #a03d47;
+  background: #fbecee;
+}
 .full {
   width: 100%;
   padding: 13px;
@@ -552,6 +556,20 @@ textarea {
   justify-content: space-between;
   gap: 14px;
   margin-bottom: 18px;
+}
+.report-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 9px;
+}
+.month-picker {
+  min-width: 145px;
+}
+.month-picker input {
+  padding: 8px 10px;
+}
+.monthly-report {
+  margin-bottom: 20px;
 }
 .panel h3 {
   margin: 0 0 3px;

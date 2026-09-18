@@ -23,7 +23,7 @@ export async function GET() {
   const archiveVisibility: { in: Confidentiality[] } | undefined = scope === "all" ? undefined : scope === "public" ? { in: ["PUBLIC"] } : { in: ["PUBLIC", "INTERNAL", "EXECUTIVE"] };
   const [members, sessions, archive, attendance]: any[] = await Promise.all([
     prisma.member.findMany({ where: { status: "ACTIVE" }, include: { attendance: true }, orderBy: { fullName: "asc" } }),
-    prisma.attendanceSession.findMany({ orderBy: { date: "desc" }, take: 8, include: { attendance: true } }),
+    prisma.attendanceSession.findMany({ orderBy: { date: "desc" }, include: { attendance: true } }),
     prisma.archiveItem.findMany({ where: { deletedAt: null, ...(archiveVisibility ? { confidentiality: archiveVisibility } : {}) }, orderBy: { createdAt: "desc" }, take: 8, include: { uploadedBy: { select: { name: true } } } }),
     prisma.attendance.findMany(),
   ]);

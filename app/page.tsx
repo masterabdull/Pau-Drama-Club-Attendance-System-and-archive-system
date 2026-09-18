@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Check,
   ChevronRight,
+  Download,
   Eye,
   EyeOff,
   FilePlus2,
@@ -593,6 +594,7 @@ function AttendanceView({
           accent
         />
       </div>
+      {canEdit && <MonthlyAttendanceReport />}
       <AttendanceCharts data={data} />
       <div className="content-grid">
         <section className="panel ranking-panel">
@@ -642,8 +644,8 @@ function AttendanceView({
         <section className="panel">
           <div className="panel-head">
             <div>
-              <h3>Recent sessions</h3>
-              <p className="muted">Open a session to update statuses.</p>
+              <h3>All sessions</h3>
+              <p className="muted">Open a session to update statuses or delete it.</p>
             </div>
           </div>
           {data.sessions.length ? (
@@ -699,9 +701,94 @@ function AttendanceView({
             setActiveSession(null);
             await onFlash("Attendance updated.");
           }}
+          onDeleted={async () => {
+            setActiveSession(null);
+            await onFlash("Session deleted.");
+          }}
         />
       )}
     </div>
+  );
+}
+
+function MonthlyAttendanceReport() {
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [report, setReport] = useState<any>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setError("");
+    requestJson(`/api/sessions/report?month=${month}`)
+      .then(setReport)
+      .catch((err) => setError(err instanceof Error ? err.message : "Could not load the monthly report."));
+  }, [month]);
+
+  function exportCsv() {
+    if (!report) return;
+    const headers = ["Member", "Sessions", "Present", "Late", "Absent", "Excused", "Attendance rate"];
+    const values = report.rows.map((row: any) => [row.name, row.sessions, row.PRESENT, row.LATE, row.ABSENT, row.EXCUSED, `${row.rate}%`]);
+    const csvRows: Array<Array<string | number>> = [headers, ...values];
+    const csv = csvRows.map((row) => row.map((value: string | number) => `"${String(value).replaceAll('"', '""')}"`).join(",")).join("\n");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    link.download = `attendance-${month}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
+  return (
+    <section className="panel monthly-report">
+      <div className="panel-head">
+        <div>
+          <h3>Monthly attendance</h3>
+          <p className="muted">Each member's attendance status for the selected month.</p>
+        </div>
+        <div className="report-actions">
+          <label className="month-picker">
+            Month
+            <input type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
+          </label>
+          <button className="button quiet" disabled={!report} onClick={exportCsv} title="Export monthly attendance CSV">
+            <Download size={16} />
+            Export CSV
+          </button>
+        </div>
+      </div>
+      {error ? <p className="error-text">{error}</p> : report?.rows.length ? (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Sessions</th>
+                <th>Present</th>
+                <th>Late</th>
+                <th>Absent</th>
+                <th>Excused</th>
+                <th>Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.rows.map((row: any) => (
+                <tr key={row.id}>
+                  <td><strong>{row.name}</strong></td>
+                  <td>{row.sessions}</td>
+                  <td>{row.PRESENT}</td>
+                  <td>{row.LATE}</td>
+                  <td>{row.ABSENT}</td>
+                  <td>{row.EXCUSED}</td>
+                  <td><span className="rate">{row.rate}%</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : report ? (
+        <EmptyState title="No sessions this month" copy="Create a session in this month to build its attendance report." />
+      ) : (
+        <div className="loading-panel">Loading monthly report...</div>
+      )}
+    </section>
   );
 }
 
@@ -956,18 +1043,20 @@ function AttendanceModal({
   session,
   onClose,
   onUpdated,
+  onDeleted,
   canEdit,
 }: {
   session: Session;
   onClose: () => void;
   onUpdated: () => Promise<void>;
+  onDeleted: () => Promise<void>;
   canEdit: boolean;
 }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [search, setSearch] = useState("");
   useEffect(() => {
     requestJson(`/api/members?search=${encodeURIComponent(search)}`).then(
-      (data) => setMembers(data.members),
+      (data) => setMembers(data.members.sort((a: Member, b: Member) => a.fullName.localeCompare(b.fullName))),
     );
   }, [search]);
   async function update(memberId: string, status: string) {
@@ -986,6 +1075,11 @@ function AttendanceModal({
           : member,
       ),
     );
+  }
+  async function removeSession() {
+    if (!window.confirm(`Delete the session "${session.name}"? Its attendance records will also be deleted.`)) return;
+    await requestJson(`/api/sessions/${session.id}`, { method: "DELETE" });
+    await onDeleted();
   }
   return (
     <Modal
@@ -1024,6 +1118,11 @@ function AttendanceModal({
         ))}
       </div>
       <div className="modal-actions">
+        {canEdit && (
+          <button className="button quiet danger-button" onClick={removeSession}>
+            Delete session
+          </button>
+        )}
         <button className="button primary" onClick={onUpdated}>
           Done
         </button>

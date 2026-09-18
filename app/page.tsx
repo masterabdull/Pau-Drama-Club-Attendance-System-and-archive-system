@@ -1183,13 +1183,18 @@ function ArchiveView({
   const [items, setItems] = useState<ArchiveItem[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
+  const [year, setYear] = useState("");
+  const [semester, setSemester] = useState("");
+  const [production, setProduction] = useState("");
+  const [confidentiality, setConfidentiality] = useState("All");
+  const [mimeType, setMimeType] = useState("All");
   const [selectedItem, setSelectedItem] = useState<ArchiveItem | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   useEffect(() => {
-    requestJson(`/api/archive?search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}`).then(
+    requestJson(`/api/archive?search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}&year=${encodeURIComponent(year)}&semester=${encodeURIComponent(semester)}&production=${encodeURIComponent(production)}&confidentiality=${encodeURIComponent(confidentiality === "All" ? "" : confidentiality)}&mimeType=${encodeURIComponent(mimeType === "All" ? "" : mimeType)}`).then(
       (result) => setItems(result.items),
     );
-  }, [search, category]);
+  }, [search, category, year, semester, production, confidentiality, mimeType]);
   const kinds = data?.stats?.byKind || {};
   const groupedItems = items.reduce<Record<string, ArchiveItem[]>>((groups, item) => {
     (groups[item.category] ||= []).push(item);
@@ -1248,6 +1253,11 @@ function ArchiveView({
                 {categories.map((option) => <option key={option}>{option}</option>)}
               </select>
             </label>
+            <input className="archive-filter-input" type="number" value={year} onChange={(e) => setYear(e.target.value)} placeholder="Year" />
+            <input className="archive-filter-input" value={semester} onChange={(e) => setSemester(e.target.value)} placeholder="Semester" />
+            <input className="archive-filter-input" value={production} onChange={(e) => setProduction(e.target.value)} placeholder="Production" />
+            <select value={mimeType} onChange={(e) => setMimeType(e.target.value)}><option>All</option><option value="image/">Images</option><option value="video/">Videos</option><option value="audio/">Audio</option><option value="application/">Documents</option></select>
+            <select value={confidentiality} onChange={(e) => setConfidentiality(e.target.value)}><option>All</option><option>PUBLIC</option><option>INTERNAL</option><option>EXECUTIVE</option><option>RESTRICTED</option></select>
             <div className="search-field">
               <Search size={16} />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search title, production, category" />
@@ -1272,7 +1282,7 @@ function ArchiveView({
           />
         )}
       </section>
-      {selectedItem && <ArchiveDetailsModal item={selectedItem} canEdit={canEdit} onClose={() => setSelectedItem(null)} onDeleted={async () => { setSelectedItem(null); await onFlash("Archive item moved to recycle bin."); requestJson(`/api/archive?search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}`).then((result) => setItems(result.items)); }} />}
+      {selectedItem && <ArchiveDetailsModal item={selectedItem} canEdit={canEdit} onClose={() => setSelectedItem(null)} onDeleted={async () => { setSelectedItem(null); await onFlash("Archive item moved to recycle bin."); requestJson(`/api/archive?search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}&year=${encodeURIComponent(year)}&semester=${encodeURIComponent(semester)}&production=${encodeURIComponent(production)}&confidentiality=${encodeURIComponent(confidentiality === "All" ? "" : confidentiality)}&mimeType=${encodeURIComponent(mimeType === "All" ? "" : mimeType)}`).then((result) => setItems(result.items)); }} />}
       {uploadOpen && (
         <UploadModal
           onClose={() => setUploadOpen(false)}

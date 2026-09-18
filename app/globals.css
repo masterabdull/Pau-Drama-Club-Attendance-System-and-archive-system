@@ -907,9 +907,12 @@ td small {
   display: flex;
   align-items: flex-end;
   gap: 10px;
+  flex-wrap: wrap;
 }
 .category-filter { min-width: 150px; }
 .category-filter select { padding: 9px 10px; }
+.archive-filter-input,
+.archive-filters > select { width: 125px; padding: 9px 10px; }
 .archive-folders { display: grid; gap: 24px; }
 .archive-folder { border-top: 1px solid var(--line); padding-top: 16px; }
 .folder-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }

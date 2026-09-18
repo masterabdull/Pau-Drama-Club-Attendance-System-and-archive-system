@@ -18,12 +18,17 @@ export async function GET(request: Request) {
   const search = params.get("search") || "";
   const year = params.get("year");
   const category = params.get("category");
+  const semester = params.get("semester");
+  const production = params.get("production");
+  const confidentiality = params.get("confidentiality");
+  const mimeType = params.get("mimeType");
   const scope = archiveScope(user.role);
   const visibility: { in: Confidentiality[] } | undefined = scope === "all" ? undefined : scope === "public" ? { in: ["PUBLIC"] } : { in: ["PUBLIC", "INTERNAL", "EXECUTIVE"] };
   const terms = scope === "musical" ? ["musical", "music"] : scope === "drama" ? ["drama"] : scope === "publicity" ? ["publicity", "promotion", "marketing"] : scope === "drama-musical" ? ["drama", "musical", "music"] : [];
   const searchMatch = [{ fileName: { contains: search } }, { production: { contains: search } }, { category: { contains: search } }, { tags: { contains: search } }, { description: { contains: search } }];
   const scopeMatch = terms.flatMap((term) => [{ fileName: { contains: term } }, { production: { contains: term } }, { category: { contains: term } }, { tags: { contains: term } }, { description: { contains: term } }]);
-  const items = await prisma.archiveItem.findMany({ where: { deletedAt: null, ...(visibility ? { confidentiality: visibility } : {}), ...(year ? { year: Number(year) } : {}), ...(category && category !== "All" ? { category } : {}), AND: [{ OR: searchMatch }, ...(scopeMatch.length ? [{ OR: scopeMatch }] : [])] }, orderBy: { createdAt: "desc" }, include: { uploadedBy: { select: { name: true } } } });
+  const requestedConfidentiality = ["PUBLIC", "INTERNAL", "EXECUTIVE", "RESTRICTED"].includes(confidentiality || "") ? confidentiality as Confidentiality : null;
+  const items = await prisma.archiveItem.findMany({ where: { deletedAt: null, ...(visibility ? { confidentiality: visibility } : {}), ...(requestedConfidentiality ? { confidentiality: requestedConfidentiality } : {}), ...(year && Number.isFinite(Number(year)) ? { year: Number(year) } : {}), ...(category && category !== "All" ? { category } : {}), ...(semester ? { semester: { contains: semester } } : {}), ...(production ? { production: { contains: production } } : {}), ...(mimeType ? { mimeType: { contains: mimeType } } : {}), AND: [{ OR: searchMatch }, ...(scopeMatch.length ? [{ OR: scopeMatch }] : [])] }, orderBy: { createdAt: "desc" }, include: { uploadedBy: { select: { name: true } } } });
   return NextResponse.json({ items });
 }
 

@@ -571,6 +571,42 @@ textarea {
 .monthly-report {
   margin-bottom: 20px;
 }
+.shortlist-panel {
+  margin-bottom: 22px;
+}
+.threshold-controls {
+  display: flex;
+  gap: 8px;
+}
+.threshold-controls label {
+  font-size: 10px;
+  color: var(--muted);
+}
+.threshold-controls input {
+  width: 68px;
+  padding: 7px;
+  margin-top: 3px;
+}
+.shortlist-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.shortlist-group {
+  padding: 13px;
+  border-radius: 8px;
+  background: var(--blue-100);
+}
+.shortlist-group.excellent { background: #e9f6ed; }
+.shortlist-group.good { background: #eef5fc; }
+.shortlist-group.average { background: var(--gold-soft); }
+.shortlist-group.low { background: #fbecee; }
+.shortlist-group strong,
+.shortlist-group small { display: block; }
+.shortlist-group strong { color: var(--blue-950); }
+.shortlist-group small { color: var(--muted); font-size: 11px; margin-top: 3px; }
+.shortlist-group p { display: flex; justify-content: space-between; gap: 8px; margin: 12px 0 0; font-size: 12px; }
+.shortlist-group p b { color: var(--blue-900); }
 .panel h3 {
   margin: 0 0 3px;
   font-family: "Quicksand", sans-serif;
@@ -614,6 +650,39 @@ td small {
   color: var(--muted);
   margin-top: 3px;
 }
+.clickable-row {
+  cursor: pointer;
+}
+.clickable-row:hover td {
+  background: var(--blue-100);
+}
+.attendance-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.attendance-summary div {
+  background: var(--blue-100);
+  border-radius: 8px;
+  padding: 12px;
+}
+.attendance-summary strong,
+.attendance-summary small {
+  display: block;
+}
+.attendance-summary strong {
+  color: var(--blue-950);
+  font-size: 20px;
+}
+.attendance-summary small {
+  color: var(--muted);
+  margin-top: 3px;
+}
+.attendance-status.present { color: #3b7653; background: #e9f6ed; }
+.attendance-status.absent { color: #a14b53; background: #fbecee; }
+.attendance-status.late { color: #85651e; background: var(--gold-soft); }
+.attendance-status.excused { color: var(--purple); background: var(--purple-soft); }
 .rate {
   color: #967020;
   background: var(--gold-soft);

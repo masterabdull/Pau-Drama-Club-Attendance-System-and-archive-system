@@ -37,7 +37,7 @@ type Member = {
   department?: string | null;
   level?: string | null;
   clubRole?: string | null;
-  attendance: { status: string }[];
+  attendance: { id?: string; status: string; updatedAt?: string; session?: { name: string; date: string; meetingType: string } }[];
 };
 type Session = {
   id: string;
@@ -596,6 +596,7 @@ function AttendanceView({
       </div>
       {canEdit && <MonthlyAttendanceReport />}
       <AttendanceCharts data={data} />
+      <AttendanceShortlist ranking={data.ranking} />
       <div className="content-grid">
         <section className="panel ranking-panel">
           <div className="panel-head">
@@ -708,6 +709,39 @@ function AttendanceView({
         />
       )}
     </div>
+  );
+}
+
+function AttendanceShortlist({ ranking }: { ranking: Array<{ id: string; name: string; rate: number }> }) {
+  const [excellentThreshold, setExcellentThreshold] = useState(90);
+  const [goodThreshold, setGoodThreshold] = useState(75);
+  const [averageThreshold, setAverageThreshold] = useState(50);
+  const groups = [
+    { label: "Excellent attendance", range: `${excellentThreshold}% and above`, members: ranking.filter((member) => member.rate >= excellentThreshold), className: "excellent" },
+    { label: "Good attendance", range: `${goodThreshold}% - ${excellentThreshold - 1}%`, members: ranking.filter((member) => member.rate >= goodThreshold && member.rate < excellentThreshold), className: "good" },
+    { label: "Average attendance", range: `${averageThreshold}% - ${goodThreshold - 1}%`, members: ranking.filter((member) => member.rate >= averageThreshold && member.rate < goodThreshold), className: "average" },
+    { label: "Low attendance", range: `Below ${averageThreshold}%`, members: ranking.filter((member) => member.rate < averageThreshold), className: "low" },
+  ];
+  return (
+    <section className="panel shortlist-panel">
+      <div className="panel-head">
+        <div><h3>Attendance shortlist</h3><p className="muted">Members grouped by attendance rate.</p></div>
+        <div className="threshold-controls">
+          <label>Excellent<input type="number" min="1" max="100" value={excellentThreshold} onChange={(event) => setExcellentThreshold(Number(event.target.value))} /></label>
+          <label>Good<input type="number" min="0" max="99" value={goodThreshold} onChange={(event) => setGoodThreshold(Number(event.target.value))} /></label>
+          <label>Average<input type="number" min="0" max="98" value={averageThreshold} onChange={(event) => setAverageThreshold(Number(event.target.value))} /></label>
+        </div>
+      </div>
+      <div className="shortlist-grid">
+        {groups.map((group) => (
+          <div className={`shortlist-group ${group.className}`} key={group.label}>
+            <div><strong>{group.label}</strong><small>{group.range}</small></div>
+            {group.members.length ? group.members.slice(0, 5).map((member) => <p key={member.id}><span>{member.name}</span><b>{Math.round(member.rate)}%</b></p>) : <small>No members in this range.</small>}
+            {group.members.length > 5 && <small>+ {group.members.length - 5} more</small>}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1619,6 +1653,7 @@ function MembersView({
   const [members, setMembers] = useState<Member[]>([]);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   useEffect(() => {
     requestJson(`/api/members?search=${encodeURIComponent(search)}`).then(
       (result) => setMembers(result.members),
@@ -1670,7 +1705,7 @@ function MembersView({
                   ["PRESENT", "LATE"].includes(item.status),
                 ).length;
                 return (
-                  <tr key={member.id}>
+                  <tr key={member.id} className="clickable-row" onClick={() => setSelectedMember(member)}>
                     <td>
                       <strong>{member.fullName}</strong>
                       <small>{member.level || "Level not set"}</small>
@@ -1691,6 +1726,12 @@ function MembersView({
           </table>
         </div>
       </section>
+      {selectedMember && (
+        <MemberAttendanceModal
+          member={selectedMember}
+          onClose={() => setSelectedMember(null)}
+        />
+      )}
       {open && (
         <MemberModal
           onClose={() => setOpen(false)}
@@ -1704,6 +1745,45 @@ function MembersView({
         />
       )}
     </div>
+  );
+}
+function MemberAttendanceModal({
+  member,
+  onClose,
+}: {
+  member: Member;
+  onClose: () => void;
+}) {
+  const attended = member.attendance.filter((item) => ["PRESENT", "LATE"].includes(item.status)).length;
+  return (
+    <Modal
+      title={`${member.fullName}'s attendance`}
+      subtitle={`${member.department || "Department not set"} · ${member.level || "Level not set"}`}
+      onClose={onClose}
+    >
+      <div className="attendance-summary">
+        <div><strong>{member.attendance.length}</strong><small>Sessions</small></div>
+        <div><strong>{attended}</strong><small>Attended</small></div>
+        <div><strong>{member.attendance.length ? `${Math.round((attended / member.attendance.length) * 100)}%` : "No data"}</strong><small>Rate</small></div>
+      </div>
+      {member.attendance.length ? (
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Session</th><th>Type</th><th>Status</th></tr></thead>
+            <tbody>
+              {[...member.attendance].sort((a, b) => new Date(b.session?.date || 0).getTime() - new Date(a.session?.date || 0).getTime()).map((record, index) => (
+                <tr key={record.id || `${record.session?.date}-${index}`}>
+                  <td>{record.session?.date ? new Date(record.session.date).toLocaleDateString() : "Unknown"}</td>
+                  <td>{record.session?.name || "Session"}</td>
+                  <td>{record.session?.meetingType || "-"}</td>
+                  <td><span className={`rate attendance-status ${record.status.toLowerCase()}`}>{attendanceLabels[record.status] || record.status}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : <EmptyState title="No attendance yet" copy="This member has no recorded attendance." />}
+    </Modal>
   );
 }
 function MemberModal({

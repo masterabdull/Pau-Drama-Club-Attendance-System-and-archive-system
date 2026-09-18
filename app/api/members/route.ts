@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
   const search = new URL(request.url).searchParams.get("search") || "";
   const ownMember = user.role === "MEMBER" ? { OR: [{ userId: user.id }, { email: user.email }] } : {};
-  const members = await prisma.member.findMany({ where: { ...ownMember, OR: [{ fullName: { contains: search } }, { department: { contains: search } }] }, orderBy: { fullName: "asc" }, include: { attendance: true } });
+  const members = await prisma.member.findMany({ where: { ...ownMember, OR: [{ fullName: { contains: search } }, { department: { contains: search } }] }, orderBy: { fullName: "asc" }, include: { attendance: { include: { session: true } } } });
   return NextResponse.json({ members });
 }
 

@@ -38,6 +38,12 @@ type Member = {
   level?: string | null;
   clubRole?: string | null;
   status?: string;
+  email?: string | null;
+  birthday?: string | null;
+  course?: string | null;
+  hostel?: string | null;
+  pronouns?: string | null;
+  gender?: string | null;
   attendance: { id?: string; status: string; updatedAt?: string; session?: { name: string; date: string; meetingType: string } }[];
 };
 type Session = {
@@ -310,9 +316,13 @@ export default function Home() {
     }
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleFocus);
+    const refreshTimer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refreshUser();
+    }, 10000);
     return () => {
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleFocus);
+      window.clearInterval(refreshTimer);
     };
   }, []);
   if (loading)
@@ -341,6 +351,7 @@ function Workspace({ user, onLogout, onUserUpdate }: { user: User; onLogout: () 
   const canEditArchive = canManageArchive(user.role);
   useEffect(() => {
     if (user.role !== "SUPER_ADMIN" && view === "access") setView("attendance");
+    if (user.role === "MEMBER" && view === "members") setView("attendance");
   }, [user.role, view]);
   async function refresh() {
     try {
@@ -604,6 +615,7 @@ function AttendanceView({
         <Stat label="Highest attendance" value={`${stats.highestAttendance}%`} icon={<BarChart3 size={18} />} />
         <Stat label="Lowest attendance" value={`${stats.lowestAttendance}%`} icon={<BarChart3 size={18} />} />
       </div>
+      {data.birthdaysThisWeek?.length > 0 && <BirthdayAlert birthdays={data.birthdaysThisWeek} />}
       {canEdit && <MonthlyAttendanceReport />}
       <AttendanceCharts data={data} />
       <AttendanceShortlist ranking={data.ranking} />
@@ -720,6 +732,12 @@ function AttendanceView({
       )}
     </div>
   );
+}
+
+function BirthdayAlert({ birthdays }: { birthdays: Array<{ id: string; name: string; birthday: string }> }) {
+  const today = new Date();
+  const todayBirthdays = birthdays.filter((member) => { const date = new Date(member.birthday); return date.getMonth() === today.getMonth() && date.getDate() === today.getDate(); });
+  return <div className="birthday-alert"><strong>{todayBirthdays.length ? "Birthday today" : "Birthdays this week"}</strong><span>{birthdays.map((member) => `${member.name} (${new Date(member.birthday).toLocaleDateString(undefined, { month: "short", day: "numeric" })})`).join(" · ")}</span></div>;
 }
 
 function AttendanceShortlist({ ranking }: { ranking: Array<{ id: string; name: string; rate: number }> }) {
@@ -1842,6 +1860,7 @@ function MemberAttendanceModal({
       subtitle={`${member.department || "Department not set"} · ${member.level || "Level not set"}`}
       onClose={onClose}
     >
+        <div className="member-profile-details"><p><strong>Email</strong>{member.email || "Not set"}</p><p><strong>Birthday</strong>{member.birthday ? new Date(member.birthday).toLocaleDateString() : "Not set"}</p><p><strong>Course</strong>{member.course || "Not set"}</p><p><strong>Hostel</strong>{member.hostel || "Not set"}</p><p><strong>Pronouns</strong>{member.pronouns || "Not set"}</p><p><strong>Gender</strong>{member.gender || "Not set"}</p></div>
       <div className="attendance-summary">
         <div><strong>{member.attendance.length}</strong><small>Sessions</small></div>
         <div><strong>{attended}</strong><small>Attended</small></div>
@@ -1876,7 +1895,7 @@ function MemberModal({
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
-  const [form, setForm] = useState({ fullName: member?.fullName || "", studentId: member?.studentId || "", email: "", department: member?.department || "", level: member?.level || "", clubRole: member?.clubRole || "", status: member?.status || "ACTIVE" });
+  const [form, setForm] = useState({ fullName: member?.fullName || "", studentId: member?.studentId || "", email: member?.email || "", birthday: member?.birthday ? member.birthday.slice(0, 10) : "", course: member?.course || "", hostel: member?.hostel || "", pronouns: member?.pronouns || "", gender: member?.gender || "", department: member?.department || "", level: member?.level || "", clubRole: member?.clubRole || "", status: member?.status || "ACTIVE" });
   const [error, setError] = useState("");
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -1918,6 +1937,17 @@ function MemberModal({
               onChange={(e) => setForm({ ...form, level: e.target.value })}
             />
           </label>
+        </div>
+        <div className="form-row">
+          <label>Birthday<input type="date" value={form.birthday} onChange={(e) => setForm({ ...form, birthday: e.target.value })} /></label>
+          <label>Course<input value={form.course} onChange={(e) => setForm({ ...form, course: e.target.value })} /></label>
+        </div>
+        <div className="form-row">
+          <label>Hostel<input value={form.hostel} onChange={(e) => setForm({ ...form, hostel: e.target.value })} /></label>
+          <label>Pronouns<input value={form.pronouns} onChange={(e) => setForm({ ...form, pronouns: e.target.value })} /></label>
+        </div>
+        <div className="form-row">
+          <label>Gender<input value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} /></label>
         </div>
         <div className="form-row">
           <label>

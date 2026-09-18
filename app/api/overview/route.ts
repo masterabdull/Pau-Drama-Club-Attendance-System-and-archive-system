@@ -27,6 +27,14 @@ export async function GET() {
     prisma.archiveItem.findMany({ where: { deletedAt: null, ...(archiveVisibility ? { confidentiality: archiveVisibility } : {}) }, orderBy: { createdAt: "desc" }, take: 8, include: { uploadedBy: { select: { name: true } } } }),
     prisma.attendance.findMany(),
   ]);
+  const currentDate = new Date();
+  const birthdaysThisWeek = members.filter((member: any) => {
+    if (!member.birthday) return false;
+    const birthday = new Date(member.birthday);
+    const nextBirthday = new Date(currentDate.getFullYear(), birthday.getMonth(), birthday.getDate());
+    const difference = Math.round((nextBirthday.getTime() - new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate()).getTime()) / 86400000);
+    return difference >= 0 && difference <= 6;
+  }).map((member: any) => ({ id: member.id, name: member.fullName, birthday: member.birthday }));
   const attended = attendance.filter((item: any) => item.status === "PRESENT" || item.status === "LATE").length;
   const averageAttendance = attendance.length ? (attended / attendance.length) * 100 : 0;
   const now = new Date();
@@ -52,5 +60,5 @@ export async function GET() {
     result[session.meetingType] = total ? Math.round((result[session.meetingType] || 0) + (present / total) * 100) : result[session.meetingType] || 0;
     return result;
   }, {});
-  return NextResponse.json({ stats: { members: members.length, sessions: await prisma.attendanceSession.count(), meetingsThisMonth, highestAttendance: ranking.length ? Math.round(ranking[0].rate) : 0, lowestAttendance: ranking.length ? Math.round(ranking[ranking.length - 1].rate) : 0, averageAttendance, archiveItems: await prisma.archiveItem.count({ where: { deletedAt: null } }), byKind, trends, byMeetingType }, ranking, sessions, archive });
+  return NextResponse.json({ stats: { members: members.length, sessions: await prisma.attendanceSession.count(), meetingsThisMonth, highestAttendance: ranking.length ? Math.round(ranking[0].rate) : 0, lowestAttendance: ranking.length ? Math.round(ranking[ranking.length - 1].rate) : 0, averageAttendance, archiveItems: await prisma.archiveItem.count({ where: { deletedAt: null } }), byKind, trends, byMeetingType }, birthdaysThisWeek, ranking, sessions, archive });
 }

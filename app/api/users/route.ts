@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser, hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { isConfiguredSuperAdmin, roleOptions, type AppRole } from "@/lib/permissions";
+import { isConfiguredSuperAdmin, roleLabels, roleOptions, type AppRole } from "@/lib/permissions";
 import { rejectCrossSiteRequest } from "@/lib/security";
 
 const role = z.enum(roleOptions as [AppRole, ...AppRole[]]);
@@ -48,6 +48,8 @@ export async function PATCH(request: Request) {
   if (body.data.role === "SUPER_ADMIN" && !isConfiguredSuperAdmin(target.email)) return NextResponse.json({ error: "Only the configured Super Admin email can use this role." }, { status: 403 });
   if (body.data.id === admin.id && body.data.role !== "SUPER_ADMIN") return NextResponse.json({ error: "You cannot remove your own Super Admin access." }, { status: 400 });
   const user = await prisma.user.update({ where: { id: body.data.id }, data: { role: body.data.role } });
+  const member = await prisma.member.findFirst({ where: { userId: user.id } });
+  if (member) await prisma.member.update({ where: { id: member.id }, data: { clubRole: roleLabels[user.role as AppRole] } });
   await prisma.auditLog.create({ data: { action: "role_changed", entity: "user", entityId: user.id, metadata: JSON.stringify({ role: user.role }), userId: admin.id } });
   return NextResponse.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 }

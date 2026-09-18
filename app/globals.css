@@ -662,6 +662,27 @@ td small {
   gap: 10px;
   margin-bottom: 18px;
 }
+.birthday-alert {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 13px 16px;
+  color: #76591a;
+  background: var(--gold-soft);
+  border: 1px solid #f0d68d;
+  border-radius: 8px;
+}
+.birthday-alert strong { color: #60470f; }
+.birthday-alert span { color: #85651e; }
+.member-profile-details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.member-profile-details p { margin: 0; padding: 9px; background: var(--blue-100); border-radius: 6px; color: var(--muted); font-size: 12px; }
+.member-profile-details strong { display: block; color: var(--blue-950); font-size: 11px; margin-bottom: 3px; }
 .attendance-summary div {
   background: var(--blue-100);
   border-radius: 8px;

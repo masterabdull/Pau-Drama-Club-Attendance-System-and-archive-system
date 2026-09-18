@@ -1912,7 +1912,7 @@ function MemberModal({
   }
   return (
     <Modal title={member ? "Edit member" : "Add member"} onClose={onClose}>
-      <form className="stack" onSubmit={submit}>
+      <form className="stack" onSubmit={submit} noValidate>
         <label>
           Full name
           <input
@@ -1923,7 +1923,7 @@ function MemberModal({
         </label>
         <div className="form-row">
           <label>
-            Student ID
+            Student ID (optional)
             <input
               value={form.studentId}
               onChange={(e) => setForm({ ...form, studentId: e.target.value })}

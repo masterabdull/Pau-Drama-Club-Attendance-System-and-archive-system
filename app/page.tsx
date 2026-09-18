@@ -37,6 +37,7 @@ type Member = {
   department?: string | null;
   level?: string | null;
   clubRole?: string | null;
+  status?: string;
   attendance: { id?: string; status: string; updatedAt?: string; session?: { name: string; date: string; meetingType: string } }[];
 };
 type Session = {
@@ -1652,13 +1653,17 @@ function MembersView({
 }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [search, setSearch] = useState("");
+  const [department, setDepartment] = useState("");
+  const [level, setLevel] = useState("");
+  const [status, setStatus] = useState("ACTIVE");
   const [open, setOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   useEffect(() => {
-    requestJson(`/api/members?search=${encodeURIComponent(search)}`).then(
+    requestJson(`/api/members?search=${encodeURIComponent(search)}&department=${encodeURIComponent(department)}&level=${encodeURIComponent(level)}&status=${status}`).then(
       (result) => setMembers(result.members),
     );
-  }, [search]);
+  }, [search, department, level, status]);
   return (
     <div className="workspace">
       <div className="section-head">
@@ -1689,6 +1694,11 @@ function MembersView({
             />
           </div>
         </div>
+        <div className="member-filters">
+          <input value={department} onChange={(event) => setDepartment(event.target.value)} placeholder="Filter department" />
+          <input value={level} onChange={(event) => setLevel(event.target.value)} placeholder="Filter level" />
+          <select value={status} onChange={(event) => setStatus(event.target.value)}><option value="ACTIVE">Active members</option><option value="INACTIVE">Inactive members</option><option value="">All statuses</option></select>
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
@@ -1697,6 +1707,7 @@ function MembersView({
                 <th>Department</th>
                 <th>Role</th>
                 <th>Attendance</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1719,6 +1730,7 @@ function MembersView({
                           : "No data"}
                       </span>
                     </td>
+                    <td><button type="button" className="text-button" onClick={(event) => { event.stopPropagation(); setSelectedMember(member); }}>View</button> {canEdit && <button type="button" className="text-button" onClick={(event) => { event.stopPropagation(); setEditingMember(member); }}>Edit</button>}</td>
                   </tr>
                 );
               })}
@@ -1730,6 +1742,18 @@ function MembersView({
         <MemberAttendanceModal
           member={selectedMember}
           onClose={() => setSelectedMember(null)}
+        />
+      )}
+      {editingMember && (
+        <MemberModal
+          member={editingMember}
+          onClose={() => setEditingMember(null)}
+          onCreated={async () => {
+            setEditingMember(null);
+            await onFlash("Member updated.");
+            const result = await requestJson(`/api/members?search=${encodeURIComponent(search)}&department=${encodeURIComponent(department)}&level=${encodeURIComponent(level)}&status=${status}`);
+            setMembers(result.members);
+          }}
         />
       )}
       {open && (
@@ -1787,28 +1811,23 @@ function MemberAttendanceModal({
   );
 }
 function MemberModal({
+  member,
   onClose,
   onCreated,
 }: {
+  member?: Member;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
-  const [form, setForm] = useState({
-    fullName: "",
-    studentId: "",
-    email: "",
-    department: "",
-    level: "",
-    clubRole: "",
-  });
+  const [form, setForm] = useState({ fullName: member?.fullName || "", studentId: member?.studentId || "", email: "", department: member?.department || "", level: member?.level || "", clubRole: member?.clubRole || "", status: member?.status || "ACTIVE" });
   const [error, setError] = useState("");
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     try {
       await requestJson("/api/members", {
-        method: "POST",
+        method: member ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(member ? { ...form, id: member.id } : form),
       });
       await onCreated();
     } catch (err) {
@@ -1816,7 +1835,7 @@ function MemberModal({
     }
   }
   return (
-    <Modal title="Add member" onClose={onClose}>
+    <Modal title={member ? "Edit member" : "Add member"} onClose={onClose}>
       <form className="stack" onSubmit={submit}>
         <label>
           Full name
@@ -1867,12 +1886,13 @@ function MemberModal({
             onChange={(e) => setForm({ ...form, email: e.target.value })}
           />
         </label>
+        {member && <label>Membership status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select></label>}
         {error && <p className="error-text">{error}</p>}
         <div className="modal-actions">
           <button type="button" className="button quiet" onClick={onClose}>
             Cancel
           </button>
-          <button className="button primary">Add member</button>
+          <button className="button primary">{member ? "Save changes" : "Add member"}</button>
         </div>
       </form>
     </Modal>

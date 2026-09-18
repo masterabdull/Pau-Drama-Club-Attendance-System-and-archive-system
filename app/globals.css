@@ -821,6 +821,16 @@ td small {
 .search-field input:focus {
   box-shadow: none;
 }
+.member-filters {
+  display: flex;
+  gap: 9px;
+  margin-bottom: 16px;
+}
+.member-filters input,
+.member-filters select {
+  max-width: 190px;
+  padding: 9px 10px;
+}
 .attendance-list {
   max-height: 52vh;
   overflow: auto;

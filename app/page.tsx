@@ -65,6 +65,7 @@ type ArchiveItem = {
   tags?: string | null;
   version?: string | null;
   capturedAt?: string | null;
+  versions?: { id: string; version: string; createdAt: string }[];
 };
 
 const attendanceLabels: Record<string, string> = {
@@ -1300,18 +1301,21 @@ function ArchiveView({
 }
 function ArchiveDetailsModal({ item, canEdit, onClose, onDeleted }: { item: ArchiveItem; canEdit: boolean; onClose: () => void; onDeleted: () => Promise<void> }) {
   const [error, setError] = useState("");
+  const [details, setDetails] = useState<ArchiveItem>(item);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({ fileName: item.fileName, category: item.category, year: item.year, semester: item.semester || "", production: item.production || "", description: item.description || "", tags: item.tags || "", confidentiality: item.confidentiality, version: item.version || "Final" });
+  useEffect(() => { requestJson(`/api/archive/${item.id}`).then((data) => setDetails(data.item)).catch(() => {}); }, [item.id]);
   const previewable = item.mimeType.startsWith("image/") || item.mimeType.startsWith("video/") || item.mimeType.startsWith("audio/") || item.mimeType === "application/pdf";
   async function remove() {
     if (!window.confirm(`Move "${item.fileName}" to the recycle bin?`)) return;
     try { await requestJson(`/api/archive/${item.id}`, { method: "DELETE" }); await onDeleted(); } catch (err) { setError(err instanceof Error ? err.message : "Could not remove archive item."); }
   }
-  return <Modal title={item.fileName} subtitle={`${item.year} · ${item.category} · ${item.confidentiality}`} onClose={onClose}>
-    {previewable && <div className="archive-preview">{item.mimeType.startsWith("image/") ? <img src={`/api/archive/${item.id}/download`} alt={item.fileName} /> : item.mimeType.startsWith("video/") ? <video controls src={`/api/archive/${item.id}/download`} /> : item.mimeType.startsWith("audio/") ? <audio controls src={`/api/archive/${item.id}/download`} /> : <iframe title={item.fileName} src={`/api/archive/${item.id}/download`} />}</div>}
-    <dl className="file-details"><div><dt>Uploaded by</dt><dd>{item.uploadedBy.name}</dd></div><div><dt>Semester</dt><dd>{item.semester || "Not set"}</dd></div><div><dt>Production/Event</dt><dd>{item.production || "Not set"}</dd></div><div><dt>Version</dt><dd>{item.version || "Not set"}</dd></div><div><dt>File type</dt><dd>{item.mimeType}</dd></div><div><dt>Size</dt><dd>{formatSize(item.size)}</dd></div></dl>
-    {item.description && <p className="muted file-description">{item.description}</p>}
-    {item.tags && <p className="muted">Tags: {item.tags}</p>}
+  async function saveMetadata(event: React.FormEvent) { event.preventDefault(); try { const data = await requestJson(`/api/archive/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); setDetails({ ...details, ...data.item }); setEditing(false); } catch (err) { setError(err instanceof Error ? err.message : "Could not save metadata."); } }
+  return <Modal title={details.fileName} subtitle={`${details.year} · ${details.category} · ${details.confidentiality}`} onClose={onClose}>
+    {previewable && <div className="archive-preview">{details.mimeType.startsWith("image/") ? <img src={`/api/archive/${details.id}/download`} alt={details.fileName} /> : details.mimeType.startsWith("video/") ? <video controls src={`/api/archive/${details.id}/download`} /> : details.mimeType.startsWith("audio/") ? <audio controls src={`/api/archive/${details.id}/download`} /> : <iframe title={details.fileName} src={`/api/archive/${details.id}/download`} />}</div>}
+    {editing ? <form className="stack" onSubmit={saveMetadata}><label>File name<input value={form.fileName} onChange={(e) => setForm({ ...form, fileName: e.target.value })} /></label><div className="form-row"><label>Category<input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></label><label>Year<input type="number" value={form.year} onChange={(e) => setForm({ ...form, year: Number(e.target.value) })} /></label></div><div className="form-row"><label>Semester<input value={form.semester} onChange={(e) => setForm({ ...form, semester: e.target.value })} /></label><label>Production<input value={form.production} onChange={(e) => setForm({ ...form, production: e.target.value })} /></label></div><label>Confidentiality<select value={form.confidentiality} onChange={(e) => setForm({ ...form, confidentiality: e.target.value })}><option>PUBLIC</option><option>INTERNAL</option><option>EXECUTIVE</option><option>RESTRICTED</option></select></label><label>Version<input value={form.version} onChange={(e) => setForm({ ...form, version: e.target.value })} /></label><label>Description<textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label><label>Tags<input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} /></label><div className="modal-actions"><button type="button" className="button quiet" onClick={() => setEditing(false)}>Cancel</button><button className="button archive-button">Save metadata</button></div></form> : <><dl className="file-details"><div><dt>Uploaded by</dt><dd>{details.uploadedBy.name}</dd></div><div><dt>Semester</dt><dd>{details.semester || "Not set"}</dd></div><div><dt>Production/Event</dt><dd>{details.production || "Not set"}</dd></div><div><dt>Version</dt><dd>{details.version || "Not set"}</dd></div><div><dt>File type</dt><dd>{details.mimeType}</dd></div><div><dt>Size</dt><dd>{formatSize(details.size)}</dd></div></dl>{details.description && <p className="muted file-description">{details.description}</p>}{details.tags && <p className="muted">Tags: {details.tags}</p>}{details.versions?.length ? <div className="version-history"><strong>Previous versions</strong>{details.versions.map((version) => <small key={version.id}>{version.version} · {new Date(version.createdAt).toLocaleString()}</small>)}</div> : null}</>}
     {error && <p className="error-text">{error}</p>}
-    <div className="modal-actions"><a className="button archive-button" href={`/api/archive/${item.id}/download`} target="_blank">Download</a>{canEdit && <button className="button quiet danger-button" onClick={remove}>Recycle item</button>}</div>
+    {!editing && <div className="modal-actions"><a className="button archive-button" href={`/api/archive/${details.id}/download`} target="_blank">Download</a>{canEdit && <><button className="button quiet" onClick={() => setEditing(true)}>Edit metadata</button><button className="button quiet danger-button" onClick={remove}>Recycle item</button></>}</div>}
   </Modal>;
 }
 function formatSize(size: number) {

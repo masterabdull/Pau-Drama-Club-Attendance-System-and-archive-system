@@ -124,9 +124,25 @@ model ArchiveItem {
   deletedAt       DateTime?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+  versions        ArchiveVersion[]
 
   @@index([year, category])
   @@index([fileName])
+}
+
+model ArchiveVersion {
+  id            String       @id @default(cuid())
+  archiveItemId String
+  version       String
+  fileName      String
+  storageName   String
+  mimeType      String
+  size          Int
+  metadata      String?
+  createdAt     DateTime     @default(now())
+  archiveItem   ArchiveItem @relation(fields: [archiveItemId], references: [id], onDelete: Cascade)
+
+  @@index([archiveItemId, createdAt])
 }
 
 model AuditLog {

@@ -944,6 +944,8 @@ td small {
 .file-details dt { color: var(--muted); font-size: 11px; }
 .file-details dd { margin: 3px 0 0; font-weight: 700; font-size: 13px; overflow-wrap: anywhere; }
 .file-description { white-space: pre-wrap; }
+.version-history { display: grid; gap: 5px; margin-top: 14px; padding: 12px; background: var(--purple-soft); border-radius: 6px; }
+.version-history small { color: var(--muted); }
 .file-icon {
   width: 36px;
   height: 36px;
